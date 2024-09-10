@@ -39,7 +39,7 @@ ibus_afrim_engine_class_init (IBusAfrimEngineClass *klass)
 static void
 ibus_afrim_engine_init (IBusAfrimEngine *afrim)
 {
-    afrim->engine_core = new_afrim_engine_core (afrim, parent_class);
+    afrim->engine_core = new_engine_core (afrim, parent_class);
     afrim->table = ibus_lookup_table_new (9, 0, TRUE, TRUE);
     g_object_ref_sink (afrim->table);
 }
@@ -55,7 +55,7 @@ ibus_afrim_engine_destroy (IBusAfrimEngine *afrim)
 
     if (afrim->engine_core)
         {
-            free_afrim_engine_core (afrim->engine_core);
+            free_engine_core (afrim->engine_core);
             afrim->engine_core = NULL;
         }
 
