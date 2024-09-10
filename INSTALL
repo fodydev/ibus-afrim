@@ -1,0 +1,29 @@
+Installation Instructions
+*************************
+0. Required: 
+    cmake      >= 3.22.0
+    ibus       >= 1.5
+   
+1. Remove the old build cache:
+  
+  If you have previous ibus-afrim,
+  You may need to remove CMakeCache.txt
+
+2. Extract source and enter the extracted directory, then:
+
+    cmake -B build . --install-prefix /usr
+    cmake --build build
+
+3. Install and register schemas:
+
+    sudo cmake --build build -t install
+
+4. Use iBus UI or run ibus-setup to add ibus-afrim.
+
+5. Restart iBus and Enjoy!
+
+    ibus restart
+
+To see other available build targets, use
+
+    cmake --build build -t help
