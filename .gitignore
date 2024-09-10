@@ -1,0 +1,12 @@
+# CMake
+/build*
+CMakeCache.txt
+CMakeFiles
+Makefile
+
+# Generated files
+include/ibus_afrim/service.h
+
+# Vim
+*.sw[pon]
+*~

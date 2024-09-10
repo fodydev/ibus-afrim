@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- filename: afrim.xml -->
+<component>
+  <name>fodydev.IBus.afrim</name>
+  <description>Afrim Input Method</description>
+  <exec>${LIBEXECDIR}/ibus-engine-afrim --ibus</exec>
+  <version>@VERSION@</version>
+  <author>Brady Fomegne</author>
+  <license>GPL</license>
+  <homepage>https://github.com/fodydev/ibus-afrim</homepage>
+  <textdomain>ibus-afrim</textdomain>
+
+	<engines>
+		<engine>
+			<name>afrim</name>
+			<language>en</language>
+			<license>GPL</license>
+			<author>Brady Fomegne</author>
+			<layout>us</layout>
+			<longname>Afrim Input Method</longname>
+			<description>Afrim Input Method</description>
+			<rank>0</rank>
+			<symbol>A</symbol>
+		</engine>
+	</engines>
+
+</component>
