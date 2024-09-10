@@ -22,7 +22,7 @@ pub struct EngineCore {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn new_afrim_engine_core(
+pub unsafe extern "C" fn new_engine_core(
     parent_engine: *mut IBusAfrimEngine,
     parent_engine_class: *mut IBusEngineClass,
 ) -> *mut EngineCore {
@@ -36,7 +36,7 @@ pub unsafe extern "C" fn new_afrim_engine_core(
 impl EngineCore {}
 
 #[no_mangle]
-pub unsafe extern "C" fn free_afrim_engine_core(engine_state: *mut EngineCore) {
+pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
     std::mem::drop(Box::from_raw(engine_state));
 }
 
