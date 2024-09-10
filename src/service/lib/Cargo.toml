@@ -6,7 +6,15 @@ edition.workspace = true
 [lib]
 crate-type = ["staticlib"] # Creates static lib
 
+[features]
+rhai = ["afrim-config/rhai", "afrim-translator/rhai"]
+default = []
+
 [dependencies]
+afrim-config = { git = "https://github.com/fodydev/afrim", version = "0.4.5" }
+afrim-preprocessor = { git = "https://github.com/fodydev/afrim", version = "0.6.1" }
+afrim-translator = { git = "https://github.com/fodydev/afrim", version = "0.2.1" }
+anyhow = "1.0.87"
 ibus = { path = "../ibus" }
 log = "0.4.22"
 simple-log = "1.7.3"
