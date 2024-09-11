@@ -1,10 +1,9 @@
 #![allow(non_upper_case_globals)]
 use std::path::Path;
+use std::ffi::{CStr, c_char};
 
-use ibus::{
-    gboolean, guint, IBusAfrimEngine, IBusEngine, IBusEngineClass,
-    IBusModifierType_IBUS_RELEASE_MASK, GBOOL_FALSE,
-};
+
+use ibus::*;
 
 use log::{self};
 use simple_log;
@@ -26,6 +25,7 @@ pub unsafe extern "C" fn new_engine_core(
     parent_engine_class: *mut IBusEngineClass,
 ) -> *mut EngineCore {
     log::info!("initializing the core engine...");
+
     Box::into_raw(Box::new(EngineCore {
         is_ctrl_released: true,
         is_idle: false,
@@ -37,14 +37,17 @@ pub unsafe extern "C" fn new_engine_core(
 impl EngineCore {
     pub unsafe fn from(ibus_afrim_engine: *mut IBusAfrimEngine) -> *mut Self {
         log::info!("getting the core engine...");
+
         (*ibus_afrim_engine).engine_core as *mut Self
     }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
+    log::info!("releasing the memory...");
     std::mem::drop(Box::from_raw(engine_state));
     afrim_api::Singleton::drop_afrim();
+    log::info!("memory released!")
 }
 
 #[no_mangle]
@@ -72,23 +75,44 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
     keycode: guint,
     modifiers: guint,
 ) -> gboolean {
-    log::info!("processing key event...");
-    match keyval {
-        // Handling of the change of mode.
-        ibus::IBUS_KEY_Control_L | ibus::IBUS_KEY_Control_R
-            if modifiers == ibus::IBusModifierType_IBUS_CONTROL_MASK =>
-        {
+    let keyname = CStr::from_ptr(ibus_keyval_name(keyval) as *const c_char);
+    let keychar = char::from_u32_unchecked(ibus_keyval_to_unicode(keyval));
+    log::info!(
+        "process key {:?} keychar={:?} keyval={} keycode={} modifiers={}",
+        keyname,
+        keychar,
+        keyval,
+        keycode,
+        modifiers
+    );
+
+    let engine_core_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
+
+    match (keyval, modifiers) {
+        // Handling of the idle state.
+        (
+            IBUS_KEY_Control_L | IBUS_KEY_Control_R,
+            IBusModifierType_IBUS_CONTROL_MASK,
+        ) => {
             log::info!("toggle idle state...");
-            let afrim_engine_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
-            (*afrim_engine_ptr).is_idle = !(*afrim_engine_ptr).is_idle;
-            log::info!("idle state: {}", (*afrim_engine_ptr).is_idle);
+
+            (*engine_core_ptr).is_idle = !(*engine_core_ptr).is_idle;
+            log::info!("idle state={}", (*engine_core_ptr).is_idle);
         }
+        _ if (*engine_core_ptr).is_idle => (),
+        (_, IBusModifierType_IBUS_CONTROL_MASK) => (),
+        // Process other key events
+        // We will manage the onpress event
+        (_, 0) if keychar != '\0' => {
+            // TODO
+        }
+        // Probably somthing that we don't want to manage
         _ => (),
     }
 
+    /*
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if let Some(afrim) = (*afrim_ptr).as_mut() {
-        log::info!("process key: {} - {} - {}", keyval, keycode, modifiers);
         //afrim.preprocessor.process(keyval);
 
         let input = afrim.preprocessor.get_input();
@@ -107,6 +131,7 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
             Err(err) => log::error!("Configuration of Afrim failed: {err:?}"),
         }
     }
+    */
 
     GBOOL_FALSE
 }

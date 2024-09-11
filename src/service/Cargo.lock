@@ -11,7 +11,7 @@ checksum = "512761e0bb2578dd7380c6baaa0f4ce03e84f95e960231d1dec8bf4d7d6e2627"
 [[package]]
 name = "afrim-config"
 version = "0.4.5"
-source = "git+https://github.com/fodydev/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
+source = "git+https://github.com/pythonbrad/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
 dependencies = [
  "anyhow",
  "indexmap",
@@ -23,25 +23,15 @@ dependencies = [
 [[package]]
 name = "afrim-memory"
 version = "0.4.2"
-source = "git+https://github.com/fodydev/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
+source = "git+https://github.com/pythonbrad/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
 
 [[package]]
 name = "afrim-preprocessor"
 version = "0.6.1"
-source = "git+https://github.com/fodydev/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
+source = "git+https://github.com/pythonbrad/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
 dependencies = [
  "afrim-memory",
  "keyboard-types",
-]
-
-[[package]]
-name = "afrim-translator"
-version = "0.2.1"
-source = "git+https://github.com/fodydev/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
-dependencies = [
- "indexmap",
- "rhai",
- "strsim",
 ]
 
 [[package]]
@@ -916,7 +906,6 @@ version = "0.1.0"
 dependencies = [
  "afrim-config",
  "afrim-preprocessor",
- "afrim-translator",
  "anyhow",
  "cbindgen",
  "ibus",
