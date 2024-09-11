@@ -1,12 +1,10 @@
 #![allow(non_upper_case_globals)]
 use std::ffi::{c_char, CStr};
-use std::path::Path;
 
 use ibus::*;
 
+use env_logger::{self};
 use log::{self};
-use simple_log;
-use simple_log::LogConfigBuilder;
 
 mod afrim_api;
 
@@ -30,8 +28,8 @@ pub unsafe extern "C" fn new_engine_core(
     Box::into_raw(Box::new(EngineCore {
         is_ctrl_released: true,
         is_idle: false,
-        parent_engine: parent_engine,
-        parent_engine_class: parent_engine_class,
+        parent_engine,
+        parent_engine_class,
     }))
 }
 
@@ -130,7 +128,7 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
     }
 
     let afrim_ptr = afrim_api::Singleton::get_afrim();
-    if let None = (*afrim_ptr).as_mut() {
+    if (*afrim_ptr).is_none() {
         log::info!("Configuration of Afrim...");
 
         let afrim = afrim_api::Afrim::from_config(
@@ -149,25 +147,6 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn configure_logging() {
-    static DATA_DIRNAME: &str = "ibus-afrim";
-
-    let log_dir = std::env::var("XDG_DATA_HOME")
-        .map(|dir| Path::new(dir.as_str()).to_path_buf())
-        .or(std::env::var("HOME").map(|home| Path::new(home.as_str()).join(".local").join("share")))
-        .map(|path| path.join(DATA_DIRNAME).join("debug.log"))
-        .unwrap_or(Path::new("/dev/null").to_path_buf());
-
-    let config = LogConfigBuilder::builder()
-        .path(log_dir.to_str().unwrap())
-        .size(1 * 100)
-        .roll_count(10)
-        .level("debug")
-        .output_file()
-        .output_console()
-        .build();
-
-    simple_log::new(config).unwrap();
-
-    log::info!("Logging initialized");
+pub extern "C" fn configure_logging() {
+    env_logger::init();
 }

@@ -18,11 +18,6 @@ impl Afrim {
         let config = Config::from_file(config_file)?;
 
         // Core
-        let auto_commit = config
-            .core
-            .as_ref()
-            .and_then(|c| c.auto_commit)
-            .unwrap_or(false);
         let buffer_size = config
             .core
             .as_ref()

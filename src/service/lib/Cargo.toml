@@ -10,9 +10,9 @@ crate-type = ["staticlib"] # Creates static lib
 afrim-config = { git = "https://github.com/pythonbrad/afrim", version = "0.4.5" }
 afrim-preprocessor = { git = "https://github.com/pythonbrad/afrim", version = "0.6.1" }
 anyhow = "1.0.87"
+env_logger = "0.11.5"
 ibus = { path = "../ibus" }
 log = "0.4.22"
-simple-log = "1.7.3"
 
 [build-dependencies]
 cbindgen = "0.27.0"
