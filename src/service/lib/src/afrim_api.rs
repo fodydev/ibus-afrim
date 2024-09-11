@@ -2,7 +2,7 @@
 /// Binding of the afrim api.
 ///
 use afrim_config::Config;
-use afrim_preprocessor::Preprocessor;
+use afrim_preprocessor::{utils, Preprocessor};
 use anyhow::Result;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -38,9 +38,7 @@ impl Afrim {
         let map = utils::build_map(data);
         let preprocessor = Preprocessor::new(map.into(), buffer_size);
 
-        Ok(Self {
-            preprocessor,
-        })
+        Ok(Self { preprocessor })
     }
 }
 
@@ -83,8 +81,4 @@ impl Singleton {
 
         drop(Box::from_raw(instance_ptr));
     }
-}
-
-mod utils {
-    pub use afrim_preprocessor::utils::*;
 }

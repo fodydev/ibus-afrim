@@ -1,7 +1,6 @@
 #![allow(non_upper_case_globals)]
+use std::ffi::{c_char, CStr};
 use std::path::Path;
-use std::ffi::{CStr, c_char};
-
 
 use ibus::*;
 
@@ -10,6 +9,8 @@ use simple_log;
 use simple_log::LogConfigBuilder;
 
 mod afrim_api;
+
+mod utils;
 
 #[repr(C)]
 pub struct EngineCore {
@@ -87,37 +88,49 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
     );
 
     let engine_core_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
+    let afrim_ptr = afrim_api::Singleton::get_afrim();
 
     match (keyval, modifiers) {
         // Handling of the idle state.
-        (
-            IBUS_KEY_Control_L | IBUS_KEY_Control_R,
-            IBusModifierType_IBUS_CONTROL_MASK,
-        ) => {
+        (IBUS_KEY_Control_L | IBUS_KEY_Control_R, IBusModifierType_IBUS_CONTROL_MASK) => {
             log::info!("toggle idle state...");
 
             (*engine_core_ptr).is_idle = !(*engine_core_ptr).is_idle;
             log::info!("idle state={}", (*engine_core_ptr).is_idle);
         }
         _ if (*engine_core_ptr).is_idle => (),
-        (_, IBusModifierType_IBUS_CONTROL_MASK) => (),
-        // Process other key events
-        // We will manage the onpress event
-        (_, 0) if keychar != '\0' => {
-            // TODO
+        // These keys should be ignored at this point
+        (
+            IBUS_KEY_Control_L | IBUS_KEY_Control_R | IBUS_KEY_Caps_Lock | IBUS_KEY_Shift_Lock
+            | IBUS_KEY_Shift_L | IBUS_KEY_Shift_R,
+            _,
+        ) => (),
+        // We want afrim to manage only characters
+        (_, 0 | IBusModifierType_IBUS_SHIFT_MASK | IBusModifierType_IBUS_LOCK_MASK)
+            if keychar != '\0' =>
+        {
+            let event = utils::char_to_afrim_key_event(keychar);
+            if let Some(afrim) = (*afrim_ptr).as_mut() {
+                afrim.preprocessor.process(event);
+                log::info!("afrim buffer_text={}", afrim.preprocessor.get_input());
+
+                // TODO: refresh the translator
+            }
         }
-        // Probably somthing that we don't want to manage
-        _ => (),
+        // Ignore all key release
+        _ if modifiers | IBusModifierType_IBUS_RELEASE_MASK == modifiers => (),
+        // Probably the user is doing another thing with his keyboard
+        _ => {
+            // This instruction trigger the internally cleaning of the `afrim-preprocessor`
+            let event = utils::char_to_afrim_key_event('\0');
+            (*afrim_ptr)
+                .as_mut()
+                .map(|afrim| afrim.preprocessor.process(event));
+        }
     }
 
-    /*
     let afrim_ptr = afrim_api::Singleton::get_afrim();
-    if let Some(afrim) = (*afrim_ptr).as_mut() {
-        //afrim.preprocessor.process(keyval);
-
-        let input = afrim.preprocessor.get_input();
-        log::info!("input: {}", input);
-    } else {
+    if let None = (*afrim_ptr).as_mut() {
         log::info!("Configuration of Afrim...");
 
         let afrim = afrim_api::Afrim::from_config(
@@ -131,7 +144,6 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
             Err(err) => log::error!("Configuration of Afrim failed: {err:?}"),
         }
     }
-    */
 
     GBOOL_FALSE
 }
