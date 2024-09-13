@@ -127,6 +127,7 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                     }
                     afrim_api::Command::CleanDelete => {}
                     afrim_api::Command::Delete => {
+                        // issue solved at https://github.com/ibus/ibus/issues/2570
                         ibus_engine_delete_surrounding_text(engine, -1, 1);
                     }
                     afrim_api::Command::Pause => {
