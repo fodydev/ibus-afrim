@@ -10,6 +10,8 @@ use log::{self};
 mod afrim_api;
 
 mod utils;
+use enigo::{Enigo, Key, Keyboard, Direction::Click};
+use std::sync::LazyLock;
 
 #[repr(C)]
 pub struct EngineCore {
@@ -119,15 +121,14 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 log::info!("executing command={:?}...", &command);
                 match command {
                     afrim_api::Command::CommitText(text) => {
-                        let text_ptr = CString::new(text).unwrap().into_raw();
-                        let ibus_text = ibus_text_new_from_string(text_ptr as *const gchar);
-                        ibus_engine_commit_text(engine, ibus_text);
+                        (*(*ENIGO as *mut Enigo)).text(&text);
 
-                        drop(CString::from_raw(text_ptr));
                     }
                     afrim_api::Command::CleanDelete => {}
                     afrim_api::Command::Delete => {
-                        ibus_engine_delete_surrounding_text(engine, -1, 1);
+                        // issue solved at https://github.com/ibus/ibus/issues/2570
+                        // ibus_engine_delete_surrounding_text(engine, -1, 1);
+                        (*(*ENIGO as *mut Enigo)).key(Key::Backspace, Click).unwrap();
                     }
                     afrim_api::Command::Pause => {
                         (*engine_core_ptr).is_idle = true;
@@ -160,6 +161,10 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
     log::info!("key processed!");
     GBOOL_FALSE
 }
+
+static ENIGO: LazyLock<usize> = LazyLock::new(|| {
+    Box::into_raw(Box::new(Enigo::new(&Default::default()).unwrap())) as usize
+});
 
 #[no_mangle]
 pub extern "C" fn configure_logging() {
