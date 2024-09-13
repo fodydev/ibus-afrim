@@ -1,5 +1,6 @@
 #![allow(non_upper_case_globals)]
-use std::ffi::{c_char, CStr};
+use std::ffi::{CStr, CString};
+use std::os::raw::c_char;
 
 use ibus::*;
 
@@ -24,19 +25,19 @@ pub unsafe extern "C" fn new_engine_core(
     parent_engine_class: *mut IBusEngineClass,
 ) -> *mut EngineCore {
     log::info!("initializing the core engine...");
-
-    Box::into_raw(Box::new(EngineCore {
+    let engine_core_ptr = Box::into_raw(Box::new(EngineCore {
         is_ctrl_released: true,
         is_idle: false,
         parent_engine,
         parent_engine_class,
-    }))
+    }));
+    log::info!("core engine initialized!");
+
+    engine_core_ptr
 }
 
 impl EngineCore {
     pub unsafe fn from(ibus_afrim_engine: *mut IBusAfrimEngine) -> *mut Self {
-        log::info!("getting the core engine...");
-
         (*ibus_afrim_engine).engine_core as *mut Self
     }
 }
@@ -77,7 +78,7 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
     let keyname = CStr::from_ptr(ibus_keyval_name(keyval) as *const c_char);
     let keychar = char::from_u32_unchecked(ibus_keyval_to_unicode(keyval));
     log::info!(
-        "process key {:?} keychar={:?} keyval={} keycode={} modifiers={}",
+        "processing key={:?} keychar={:?} keyval={} keycode={} modifiers={}...",
         keyname,
         keychar,
         keyval,
@@ -98,16 +99,10 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
         }
         _ if (*engine_core_ptr).is_idle => (),
         // These keys should be ignored at this point
-        (
-            IBUS_KEY_Control_L | IBUS_KEY_Control_R | IBUS_KEY_Caps_Lock | IBUS_KEY_Shift_Lock
-            | IBUS_KEY_Shift_L | IBUS_KEY_Shift_R,
-            _,
-        ) => (),
-        // We want afrim to manage only characters
-        (_, 0 | IBusModifierType_IBUS_SHIFT_MASK | IBusModifierType_IBUS_LOCK_MASK)
-            if keychar != '\0' =>
-        {
-            let event = utils::char_to_afrim_key_event(keychar);
+        (IBUS_KEY_Control_L | IBUS_KEY_Control_R, _) => (),
+        // We leave `afrim-preprocessor` handles key press events
+        _ if modifiers | IBusModifierType_IBUS_RELEASE_MASK != modifiers => {
+            let event = utils::ibus_keypress_event_to_afrim_key_event(keyval);
             if let Some(afrim) = (*afrim_ptr).as_mut() {
                 afrim.preprocessor.process(event);
                 log::info!("afrim buffer_text={}", afrim.preprocessor.get_input());
@@ -115,21 +110,40 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 // TODO: refresh the translator
             }
         }
-        // Ignore all key release
-        _ if modifiers | IBusModifierType_IBUS_RELEASE_MASK == modifiers => (),
-        // Probably the user is doing another thing with his keyboard
+        // Process `afrim-preprocessor` instructions on release
         _ => {
-            // This instruction trigger the internally cleaning of the `afrim-preprocessor`
-            let event = utils::char_to_afrim_key_event('\0');
-            (*afrim_ptr)
+            while let Some(command) = (*afrim_ptr)
                 .as_mut()
-                .map(|afrim| afrim.preprocessor.process(event));
+                .and_then(|afrim| afrim.preprocessor.pop_queue())
+            {
+                log::info!("executing command={:?}...", &command);
+                match command {
+                    afrim_api::Command::CommitText(text) => {
+                        let text_ptr = CString::new(text).unwrap().into_raw();
+                        let ibus_text = ibus_text_new_from_string(text_ptr as *const gchar);
+                        ibus_engine_commit_text(engine, ibus_text);
+
+                        drop(CString::from_raw(text_ptr));
+                    }
+                    afrim_api::Command::CleanDelete => {}
+                    afrim_api::Command::Delete => {
+                        ibus_engine_delete_surrounding_text(engine, -1, 1);
+                    }
+                    afrim_api::Command::Pause => {
+                        (*engine_core_ptr).is_idle = true;
+                    }
+                    afrim_api::Command::Resume => {
+                        (*engine_core_ptr).is_idle = false;
+                    }
+                };
+                log::info!("command executed!");
+            }
         }
     }
 
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if (*afrim_ptr).is_none() {
-        log::info!("Configuration of Afrim...");
+        log::info!("configuration of Afrim...");
 
         let afrim = afrim_api::Afrim::from_config(
             "/home/pythonbrad/Documents/Personal/Project/afrim-project/afrim-data/fmp/fmp.toml",
@@ -137,12 +151,13 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
         match afrim {
             Ok(afrim) => {
                 afrim_api::Singleton::update_afrim(afrim);
-                log::info!("Afrim configurated...");
+                log::info!("afrim configurated!");
             }
-            Err(err) => log::error!("Configuration of Afrim failed: {err:?}"),
+            Err(err) => log::error!("configuration of Afrim failed: {err:?}"),
         }
     }
 
+    log::info!("key processed!");
     GBOOL_FALSE
 }
 

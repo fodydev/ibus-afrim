@@ -7,6 +7,8 @@ use anyhow::Result;
 use std::path::Path;
 use std::sync::LazyLock;
 
+pub use afrim_preprocessor::Command;
+
 pub struct Afrim {
     pub preprocessor: Preprocessor,
 }
