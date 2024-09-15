@@ -6,7 +6,6 @@
 static void ibus_afrim_engine_class_init (IBusAfrimEngineClass *klass);
 static void ibus_afrim_engine_init (IBusAfrimEngine *engine);
 static void ibus_afrim_engine_destroy (IBusAfrimEngine *engine);
-static void ibus_afrim_engine_enable (IBusEngine *engine);
 
 G_DEFINE_TYPE (IBusAfrimEngine, ibus_afrim_engine, IBUS_TYPE_ENGINE)
 
@@ -33,7 +32,10 @@ ibus_afrim_engine_class_init (IBusAfrimEngineClass *klass)
     engine_class->page_up = ibus_afrim_engine_page_up_button;
     engine_class->candidate_clicked = ibus_afrim_engine_candidate_clicked;
     engine_class->focus_out = ibus_afrim_engine_focus_out;
+    engine_class->focus_in = ibus_afrim_engine_focus_in;
     engine_class->enable = ibus_afrim_engine_enable;
+    engine_class->disable = ibus_afrim_engine_disable;
+    engine_class->reset = ibus_afrim_engine_reset;
 }
 
 static void
@@ -61,12 +63,4 @@ ibus_afrim_engine_destroy (IBusAfrimEngine *afrim)
 
     ((IBusObjectClass *)ibus_afrim_engine_parent_class)
         ->destroy ((IBusObject *)afrim);
-}
-
-static void
-ibus_afrim_engine_enable (IBusEngine *engine)
-{
-    // dummy call to tell the input context that the engine will utilize
-    // surrounding-text
-    ibus_engine_get_surrounding_text (engine, NULL, NULL, NULL);
 }

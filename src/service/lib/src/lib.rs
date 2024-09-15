@@ -13,7 +13,6 @@ mod utils;
 
 #[repr(C)]
 pub struct EngineCore {
-    is_ctrl_released: bool,
     is_idle: bool,
     parent_engine: *mut IBusAfrimEngine,
     parent_engine_class: *mut IBusEngineClass,
@@ -26,7 +25,6 @@ pub unsafe extern "C" fn new_engine_core(
 ) -> *mut EngineCore {
     log::info!("initializing the core engine...");
     let engine_core_ptr = Box::into_raw(Box::new(EngineCore {
-        is_ctrl_released: true,
         is_idle: false,
         parent_engine,
         parent_engine_class,
@@ -57,7 +55,44 @@ pub unsafe extern "C" fn ibus_afrim_engine_page_down_button(_engine: *mut IBusEn
 pub unsafe extern "C" fn ibus_afrim_engine_page_up_button(_engine: *mut IBusEngine) {}
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_focus_out(_engine: *mut IBusEngine) {}
+pub unsafe extern "C" fn ibus_afrim_engine_focus_in(engine: *mut IBusEngine) {
+    log::info!("focus in!");
+    let engine_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
+    (*engine_ptr).is_idle = false;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_focus_out(engine: *mut IBusEngine) {
+    log::info!("focus out!");
+    let engine_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
+    (*engine_ptr).is_idle = true;
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_enable(engine: *mut IBusEngine) {
+    log::info!("enabled!");
+    // Request to use surrounding text feature
+    ibus_engine_get_surrounding_text(
+        engine,
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+        std::ptr::null_mut(),
+    );
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_disable(_engine: *mut IBusEngine) {
+    log::info!("disabled!");
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_reset(_engine: *mut IBusEngine) {
+    log::warn!("reset!");
+    let afrim_ptr = afrim_api::Singleton::get_afrim();
+    if let Some(afrim) = (*afrim_ptr).as_mut() {
+        afrim.preprocessor.process(Default::default());
+    }
+}
 
 #[no_mangle]
 pub unsafe extern "C" fn ibus_afrim_engine_candidate_clicked(
