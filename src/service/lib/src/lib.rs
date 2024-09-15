@@ -116,6 +116,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 .as_mut()
                 .and_then(|afrim| afrim.preprocessor.pop_queue())
             {
+                // Some applications require this delay to work properly
+                std::thread::sleep(std::time::Duration::from_millis(10));
                 log::info!("executing command={:?}...", &command);
                 match command {
                     afrim_api::Command::CommitText(text) => {
