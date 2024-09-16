@@ -31,12 +31,16 @@ pkg_check_modules(IBUS REQUIRED ibus-1.0)
 include(FetchContent)
 
 # Corrosion tools
-FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
-)
-FetchContent_MakeAvailable(Corrosion)
+if(EXISTS "${CMAKE_BINARY_DIR}/_deps/corrosion-src")
+	add_subdirectory("${CMAKE_BINARY_DIR}/_deps/corrosion-src")
+else()
+	FetchContent_Declare(
+	    Corrosion
+	    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+	    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
+	)
+	FetchContent_MakeAvailable(Corrosion)
+endif()
 # Adds Corrosion
 
 # The compiled library code is here
