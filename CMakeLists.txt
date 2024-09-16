@@ -8,6 +8,7 @@ include(GNUInstallDirs)
 set(LIBEXECDIR ${CMAKE_INSTALL_FULL_LIBEXECDIR})
 set(PKGDATADIR ${CMAKE_INSTALL_FULL_DATADIR})
 set(LOCALEDIR ${CMAKE_INSTALL_FULL_LOCALEDIR})
+set(CORROSION_SRC_DIR "${CMAKE_BINARY_DIR}/_deps/corrosion-src")
 
 add_definitions(
     -DPACKAGE_NAME="${PROJECT_NAME}"
@@ -31,12 +32,16 @@ pkg_check_modules(IBUS REQUIRED ibus-1.0)
 include(FetchContent)
 
 # Corrosion tools
-FetchContent_Declare(
-    Corrosion
-    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
-    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
-)
-FetchContent_MakeAvailable(Corrosion)
+if(EXISTS ${CORROSION_SRC_DIR})
+	add_subdirectory(${CORROSION_SRC_DIR})
+else()
+	FetchContent_Declare(
+	    Corrosion
+	    GIT_REPOSITORY https://github.com/corrosion-rs/corrosion.git
+	    GIT_TAG v0.5 # Optionally specify a commit hash, version tag or branch here
+	)
+	FetchContent_MakeAvailable(Corrosion)
+endif()
 # Adds Corrosion
 
 # The compiled library code is here
