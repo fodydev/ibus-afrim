@@ -65,21 +65,13 @@ pub unsafe extern "C" fn ibus_afrim_engine_page_up_button(engine: *mut IBusEngin
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_focus_in(engine: *mut IBusEngine) {
+pub unsafe extern "C" fn ibus_afrim_engine_focus_in(_engine: *mut IBusEngine) {
     log::info!("focus in!");
-    let engine_core_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
-    (*engine_core_ptr).is_idle = false;
-
-    ibus_engine_show_lookup_table(engine);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_focus_out(engine: *mut IBusEngine) {
+pub unsafe extern "C" fn ibus_afrim_engine_focus_out(_engine: *mut IBusEngine) {
     log::info!("focus out!");
-    let engine_core_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
-    (*engine_core_ptr).is_idle = true;
-
-    ibus_engine_hide_lookup_table(engine);
 }
 
 #[no_mangle]
@@ -101,11 +93,9 @@ pub unsafe extern "C" fn ibus_afrim_engine_disable(_engine: *mut IBusEngine) {
 
 #[no_mangle]
 pub unsafe extern "C" fn ibus_afrim_engine_reset(engine: *mut IBusEngine) {
-    log::warn!("reset!");
-    let afrim_engine_core_ptr = engine as *mut IBusAfrimEngine;
-    ibus_lookup_table_clear((*afrim_engine_core_ptr).table);
+    log::info!("reset!");
     ibus_engine_hide_auxiliary_text(engine);
-    ibus_engine_update_lookup_table(engine, (*afrim_engine_core_ptr).table, GBOOL_FALSE);
+    ibus_engine_hide_lookup_table(engine);
 
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if let Some(afrim) = (*afrim_ptr).as_mut() {
@@ -162,8 +152,9 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 afrim.preprocessor.commit(selected_candidate.to_string());
             }
         }
+        // Maybe the user is doing another thing.
+        (_, IBusModifierType_IBUS_CONTROL_MASK) => ibus_afrim_engine_reset(engine),
         // These keys should be ignored at this point
-        (_, IBusModifierType_IBUS_CONTROL_MASK) => (),
         (IBUS_KEY_Control_L | IBUS_KEY_Control_R | IBUS_KEY_Shift_L | IBUS_KEY_Shift_R, 0) => (),
         // We leave `afrim-preprocessor` handles key press events
         _ if modifiers | IBusModifierType_IBUS_RELEASE_MASK != modifiers => {
@@ -175,7 +166,9 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 log::info!("afrim buffer_text={}", &input);
                 let text_ptr = CString::new(input.to_string()).unwrap().into_raw();
                 let ibus_text = ibus_text_new_from_string(text_ptr);
-                ibus_engine_update_auxiliary_text(engine, ibus_text, GBOOL_TRUE);
+                ibus_engine_update_auxiliary_text(engine, ibus_text, GBOOL_FALSE);
+
+                drop(CString::from_raw(text_ptr));
 
                 // Refresh the candidate list
                 ibus_lookup_table_clear((*afrim_engine_core_ptr).table);
@@ -183,6 +176,10 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 let mut index = 0;
                 for predicate in afrim.translator.translate(&input) {
                     for text in predicate.texts {
+                        if text.is_empty() {
+                            continue;
+                        };
+
                         let label_text_ptr = CString::new(format!("~{}", predicate.remaining_code))
                             .unwrap()
                             .into_raw();
@@ -193,6 +190,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                             ibus_label_text,
                         );
 
+                        drop(CString::from_raw(label_text_ptr));
+
                         let text_ptr = CString::new(text).unwrap().into_raw();
                         let ibus_text = ibus_text_new_from_string(text_ptr);
                         ibus_lookup_table_append_candidate(
@@ -200,15 +199,23 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                             ibus_text,
                         );
 
+                        drop(CString::from_raw(text_ptr));
+
                         index = index + 1;
                     }
                 }
 
-                ibus_engine_update_lookup_table_fast(
-                    engine,
-                    (*afrim_engine_core_ptr).table,
-                    GBOOL_TRUE,
-                );
+                if index > 0 {
+                    ibus_engine_show_auxiliary_text(engine);
+                    ibus_engine_update_lookup_table_fast(
+                        engine,
+                        (*afrim_engine_core_ptr).table,
+                        GBOOL_TRUE,
+                    );
+                } else {
+                    ibus_engine_hide_auxiliary_text(engine);
+                    ibus_engine_hide_lookup_table(engine);
+                }
             }
         }
         // Process `afrim-preprocessor` instructions on release
