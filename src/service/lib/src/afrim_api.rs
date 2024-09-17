@@ -3,6 +3,7 @@
 ///
 use afrim_config::Config;
 use afrim_preprocessor::{utils, Preprocessor};
+use afrim_translator::Translator;
 use anyhow::Result;
 use std::path::Path;
 use std::sync::LazyLock;
@@ -11,6 +12,7 @@ pub use afrim_preprocessor::Command;
 
 pub struct Afrim {
     pub preprocessor: Preprocessor,
+    pub translator: Translator,
 }
 
 impl Afrim {
@@ -20,6 +22,11 @@ impl Afrim {
         let config = Config::from_file(config_file)?;
 
         // Core
+        let auto_commit = config
+            .core
+            .as_ref()
+            .and_then(|c| c.auto_commit)
+            .unwrap_or(false);
         let buffer_size = config
             .core
             .as_ref()
@@ -35,7 +42,26 @@ impl Afrim {
         let map = utils::build_map(data);
         let preprocessor = Preprocessor::new(map.into(), buffer_size);
 
-        Ok(Self { preprocessor })
+        // Translation
+        let translation = config.extract_translation();
+        #[cfg(feature = "rhai")]
+        let mut translator = Translator::new(translation, auto_commit);
+        #[cfg(not(feature = "rhai"))]
+        let translator = Translator::new(translation, auto_commit);
+
+        // Translators
+        #[cfg(feature = "rhai")]
+        config
+            .extract_translators()?
+            .into_iter()
+            .for_each(|(name, ast)| {
+                translator.register(name, ast);
+            });
+
+        Ok(Self {
+            preprocessor,
+            translator,
+        })
     }
 }
 

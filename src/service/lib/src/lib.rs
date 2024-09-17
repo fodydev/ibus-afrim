@@ -49,23 +49,29 @@ pub unsafe extern "C" fn free_engine_core(engine_state: *mut EngineCore) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_page_down_button(_engine: *mut IBusEngine) {}
-
-#[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_page_up_button(_engine: *mut IBusEngine) {}
-
-#[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_focus_in(engine: *mut IBusEngine) {
-    log::info!("focus in!");
-    let engine_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
-    (*engine_ptr).is_idle = false;
+pub unsafe extern "C" fn ibus_afrim_engine_page_down_button(engine: *mut IBusEngine) {
+    log::info!("pagedown button");
+    let afrim_engine_core_ptr = engine as *mut IBusAfrimEngine;
+    ibus_lookup_table_cursor_down((*afrim_engine_core_ptr).table);
+    ibus_engine_update_lookup_table_fast(engine, (*afrim_engine_core_ptr).table, GBOOL_TRUE);
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_focus_out(engine: *mut IBusEngine) {
+pub unsafe extern "C" fn ibus_afrim_engine_page_up_button(engine: *mut IBusEngine) {
+    log::info!("pageup button!");
+    let afrim_engine_core_ptr = engine as *mut IBusAfrimEngine;
+    ibus_lookup_table_cursor_up((*afrim_engine_core_ptr).table);
+    ibus_engine_update_lookup_table_fast(engine, (*afrim_engine_core_ptr).table, GBOOL_TRUE);
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_focus_in(_engine: *mut IBusEngine) {
+    log::info!("focus in!");
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ibus_afrim_engine_focus_out(_engine: *mut IBusEngine) {
     log::info!("focus out!");
-    let engine_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
-    (*engine_ptr).is_idle = true;
 }
 
 #[no_mangle]
@@ -86,21 +92,15 @@ pub unsafe extern "C" fn ibus_afrim_engine_disable(_engine: *mut IBusEngine) {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_reset(_engine: *mut IBusEngine) {
-    log::warn!("reset!");
+pub unsafe extern "C" fn ibus_afrim_engine_reset(engine: *mut IBusEngine) {
+    log::info!("reset!");
+    ibus_engine_hide_auxiliary_text(engine);
+    ibus_engine_hide_lookup_table(engine);
+
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if let Some(afrim) = (*afrim_ptr).as_mut() {
         afrim.preprocessor.process(Default::default());
     }
-}
-
-#[no_mangle]
-pub unsafe extern "C" fn ibus_afrim_engine_candidate_clicked(
-    _engine: *mut IBusEngine,
-    _indx: guint,
-    _button_state: guint,
-    _keyboard_state: guint,
-) {
 }
 
 #[no_mangle]
@@ -121,7 +121,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
         modifiers
     );
 
-    let engine_core_ptr = EngineCore::from(engine as *mut IBusAfrimEngine);
+    let afrim_engine_core_ptr = engine as *mut IBusAfrimEngine;
+    let engine_core_ptr = EngineCore::from(afrim_engine_core_ptr);
     let afrim_ptr = afrim_api::Singleton::get_afrim();
 
     match (keyval, modifiers) {
@@ -133,16 +134,88 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
             log::info!("idle state={}", (*engine_core_ptr).is_idle);
         }
         _ if (*engine_core_ptr).is_idle => (),
+        // Handling special functions
+        (IBUS_KEY_Shift_L, IBusModifierType_IBUS_CONTROL_MASK) => {
+            ibus_afrim_engine_page_up_button(engine)
+        }
+
+        (IBUS_KEY_Shift_R, IBusModifierType_IBUS_CONTROL_MASK) => {
+            ibus_afrim_engine_page_down_button(engine)
+        }
+        (IBUS_KEY_space, IBusModifierType_IBUS_CONTROL_MASK) => {
+            let index = ibus_lookup_table_get_cursor_pos((*afrim_engine_core_ptr).table);
+            let ibus_selected_label =
+                ibus_lookup_table_get_candidate((*afrim_engine_core_ptr).table, index);
+            let selected_label_ptr = (*ibus_selected_label).text;
+            if let Some(afrim) = (*afrim_ptr).as_mut() {
+                let selected_candidate = CStr::from_ptr(selected_label_ptr).to_str().unwrap();
+                afrim.preprocessor.commit(selected_candidate.to_string());
+            }
+        }
+        // Maybe the user is doing another thing.
+        (_, IBusModifierType_IBUS_CONTROL_MASK) => ibus_afrim_engine_reset(engine),
         // These keys should be ignored at this point
-        (IBUS_KEY_Control_L | IBUS_KEY_Control_R, _) => (),
+        (IBUS_KEY_Control_L | IBUS_KEY_Control_R | IBUS_KEY_Shift_L | IBUS_KEY_Shift_R, 0) => (),
         // We leave `afrim-preprocessor` handles key press events
         _ if modifiers | IBusModifierType_IBUS_RELEASE_MASK != modifiers => {
             let event = utils::ibus_keypress_event_to_afrim_key_event(keyval);
             if let Some(afrim) = (*afrim_ptr).as_mut() {
                 afrim.preprocessor.process(event);
-                log::info!("afrim buffer_text={}", afrim.preprocessor.get_input());
 
-                // TODO: refresh the translator
+                let input = afrim.preprocessor.get_input();
+                log::info!("afrim buffer_text={}", &input);
+                let text_ptr = CString::new(input.to_string()).unwrap().into_raw();
+                let ibus_text = ibus_text_new_from_string(text_ptr);
+                ibus_engine_update_auxiliary_text(engine, ibus_text, GBOOL_FALSE);
+
+                drop(CString::from_raw(text_ptr));
+
+                // Refresh the candidate list
+                ibus_lookup_table_clear((*afrim_engine_core_ptr).table);
+
+                let mut index = 0;
+                for predicate in afrim.translator.translate(&input) {
+                    for text in predicate.texts {
+                        if text.is_empty() {
+                            continue;
+                        };
+
+                        let label_text_ptr = CString::new(format!("~{}", predicate.remaining_code))
+                            .unwrap()
+                            .into_raw();
+                        let ibus_label_text = ibus_text_new_from_string(label_text_ptr);
+                        ibus_lookup_table_set_label(
+                            (*afrim_engine_core_ptr).table,
+                            index,
+                            ibus_label_text,
+                        );
+
+                        drop(CString::from_raw(label_text_ptr));
+
+                        let text_ptr = CString::new(text).unwrap().into_raw();
+                        let ibus_text = ibus_text_new_from_string(text_ptr);
+                        ibus_lookup_table_append_candidate(
+                            (*afrim_engine_core_ptr).table,
+                            ibus_text,
+                        );
+
+                        drop(CString::from_raw(text_ptr));
+
+                        index = index + 1;
+                    }
+                }
+
+                if index > 0 {
+                    ibus_engine_show_auxiliary_text(engine);
+                    ibus_engine_update_lookup_table_fast(
+                        engine,
+                        (*afrim_engine_core_ptr).table,
+                        GBOOL_TRUE,
+                    );
+                } else {
+                    ibus_engine_hide_auxiliary_text(engine);
+                    ibus_engine_hide_lookup_table(engine);
+                }
             }
         }
         // Process `afrim-preprocessor` instructions on release
@@ -179,12 +252,18 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
         }
     }
 
+    log::info!("key processed!");
+    GBOOL_FALSE
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn configure_afrim() {
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if (*afrim_ptr).is_none() {
         log::info!("configuration of Afrim...");
 
         let afrim = afrim_api::Afrim::from_config(
-            "/home/pythonbrad/Documents/Personal/Project/afrim-project/afrim-data/fmp/fmp.toml",
+            "/home/pythonbrad/Documents/Personal/Project/afrim-project/afrim-data/am/am.toml",
         );
         match afrim {
             Ok(afrim) => {
@@ -194,9 +273,6 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
             Err(err) => log::error!("configuration of Afrim failed: {err:?}"),
         }
     }
-
-    log::info!("key processed!");
-    GBOOL_FALSE
 }
 
 #[no_mangle]

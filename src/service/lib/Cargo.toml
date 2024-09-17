@@ -6,9 +6,15 @@ edition.workspace = true
 [lib]
 crate-type = ["staticlib"] # Creates static lib
 
+[features]
+default = ["rhai", "strsim"]
+rhai = ["afrim-config/rhai", "afrim-translator/rhai"]
+strsim = ["afrim-translator/strsim"]
+
 [dependencies]
-afrim-config = { git = "https://github.com/pythonbrad/afrim", version = "0.4.5" }
-afrim-preprocessor = { git = "https://github.com/pythonbrad/afrim", version = "0.6.1" }
+afrim-config = { git = "https://github.com/pythonbrad/afrim", version = "0.4.5", default-features = false }
+afrim-preprocessor = { git = "https://github.com/pythonbrad/afrim", version = "0.6.1", default-features = false }
+afrim-translator = { git = "https://github.com/pythonbrad/afrim", version = "0.2.1", default-features = false }
 anyhow = "1.0.87"
 env_logger = "0.11.5"
 ibus = { path = "../ibus" }

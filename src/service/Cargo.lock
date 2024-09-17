@@ -29,6 +29,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "afrim-translator"
+version = "0.2.1"
+source = "git+https://github.com/pythonbrad/afrim#fd6812e8ba35fca7fe1387c32ffdc3bec7fafdd1"
+dependencies = [
+ "indexmap",
+ "rhai",
+ "strsim",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -615,6 +625,7 @@ version = "0.1.0"
 dependencies = [
  "afrim-config",
  "afrim-preprocessor",
+ "afrim-translator",
  "anyhow",
  "cbindgen",
  "env_logger",

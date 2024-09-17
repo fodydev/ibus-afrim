@@ -81,6 +81,7 @@ main (int argc, char **argv)
         }
 
     configure_logging ();
+    configure_afrim ();
 
     /* Go */
     init ();
