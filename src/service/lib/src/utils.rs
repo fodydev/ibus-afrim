@@ -1,5 +1,6 @@
 use afrim_preprocessor::{Key, KeyState, KeyboardEvent};
 use ibus::*;
+use std::ffi::CString;
 
 /// Converts an IBusKeyboardEvent into a KeyboardEvent.
 pub unsafe fn ibus_keypress_event_to_afrim_key_event(keyval: guint) -> KeyboardEvent {
@@ -19,4 +20,13 @@ pub unsafe fn ibus_keypress_event_to_afrim_key_event(keyval: guint) -> KeyboardE
         state: KeyState::Down,
         ..Default::default()
     }
+}
+
+/// Converts a string to ibus text.
+pub unsafe fn string_to_ibus_text(text: String) -> *mut IBusText {
+    let text_ptr = CString::new(text).unwrap().into_raw();
+    let ibus_text = ibus_text_new_from_string(text_ptr);
+    drop(CString::from_raw(text_ptr));
+
+    ibus_text
 }
