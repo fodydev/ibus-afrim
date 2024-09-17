@@ -104,8 +104,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_reset(engine: *mut IBusEngine) {
     log::warn!("reset!");
     let afrim_engine_core_ptr = engine as *mut IBusAfrimEngine;
     ibus_lookup_table_clear((*afrim_engine_core_ptr).table);
-    ibus_engine_update_lookup_table(engine, (*afrim_engine_core_ptr).table, GBOOL_FALSE);
     ibus_engine_hide_auxiliary_text(engine);
+    ibus_engine_update_lookup_table(engine, (*afrim_engine_core_ptr).table, GBOOL_FALSE);
 
     let afrim_ptr = afrim_api::Singleton::get_afrim();
     if let Some(afrim) = (*afrim_ptr).as_mut() {
