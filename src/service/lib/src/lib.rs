@@ -237,6 +237,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                 .as_mut()
                 .and_then(|afrim| afrim.preprocessor.pop_queue())
             {
+                // Some applications require this delay to work properly
+                std::thread::sleep(std::time::Duration::from_millis(10));
                 log::info!("executing command={:?}...", &command);
                 match command {
                     afrim_api::Command::CommitText(text) => {
@@ -245,9 +247,8 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                     }
                     afrim_api::Command::CleanDelete => {}
                     afrim_api::Command::Delete => {
+                        // issue solved at https://github.com/ibus/ibus/issues/2570
                         ibus_engine_delete_surrounding_text(engine, -1, 1);
-                        // Some applications require this delay to work properly
-                        std::thread::sleep(std::time::Duration::from_millis(10));
                     }
                     afrim_api::Command::Pause => {
                         (*engine_core_ptr).is_idle = true;
