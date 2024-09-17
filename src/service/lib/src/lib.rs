@@ -8,6 +8,8 @@ use std::os::raw::c_char;
 mod afrim_api;
 mod utils;
 
+static MAX_PREDICATE_SIZE: u32 = 16;
+
 #[repr(C)]
 /// Core structure of the IME.
 pub struct EngineCore {
@@ -210,6 +212,9 @@ pub unsafe extern "C" fn ibus_afrim_engine_process_key_event(
                         );
 
                         index += 1;
+                    }
+                    if index > MAX_PREDICATE_SIZE {
+                        break;
                     }
                 }
 
